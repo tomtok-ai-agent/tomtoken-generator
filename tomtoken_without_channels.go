@@ -20,7 +20,7 @@ func tokenGenerator(count int) []interface{} {
 	tokens := make([]interface{}, 0, count)
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	spaceTokenIDs := []int{1, 3} // regular and non-breaking space
+	// Space token IDs: 1 = regular space, 3 = non-breaking space
 
 	for generated := 0; generated < count; {
 		// Generate a word

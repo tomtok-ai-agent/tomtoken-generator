@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"math/rand"
 	"os"
 	"strings"
@@ -32,7 +31,7 @@ func GenerateTokens(settings GeneratorSettings) <-chan interface{} {
 		defer close(ch)
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-		spaceTokenIDs := []int{1, 3} // regular and non-breaking space
+		// Space token IDs: 1 = regular space, 3 = non-breaking space
 
 		for generated := 0; generated < settings.TokenCount; {
 			// Generate a word
