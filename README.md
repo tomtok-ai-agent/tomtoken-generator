@@ -1,48 +1,70 @@
 # TomToken Generator
 
-This repository contains two implementations of TomToken generation with JSON serialization in Go:
+This repository contains two implementations of a TomToken stream generator in Go. TomToken is a flexible token format that allows modeling text with different types of content.
 
-1. **Without Channels**: A straightforward implementation that generates all tokens at once and stores them in memory.
-2. **With Channels**: An efficient implementation using Go channels for stream processing, which minimizes memory usage.
+## Implementations
 
-## Features
+### 1. Without Channels (`tomtoken_without_channels.go`)
 
-- Random word generation with configurable token count
-- Various token types including words, spaces, newlines, and repeats
-- JSON serialization with proper formatting
-- Command-line parameters for the channel-based implementation
+This implementation generates tokens directly in the main execution flow, writing them to the output as they are generated. It uses a traditional approach where all processing happens in a single function.
 
-## Implementation Comparison
+Key features:
+- Direct token generation and serialization
+- Manual JSON formatting with line length control
+- Command-line parameters for output destination and token count
+- Efficient memory usage through immediate serialization
 
-### Without Channels
-- Simpler implementation
-- Stores all tokens in memory
-- Suitable for smaller datasets
+### 2. With Channels (`tomtoken_with_channels.go`)
 
-### With Channels
-- Memory-efficient stream processing
-- Clear separation between generation and processing
-- Highly scalable for large datasets
-- Supports command-line parameters
+This implementation uses Go channels to separate token generation from serialization. The generator runs in a separate goroutine and sends tokens through a channel to the main routine which handles serialization.
+
+Key features:
+- Separation of concerns: generation and serialization are decoupled
+- Streaming approach using Go channels
+- Buffered channel for performance optimization
+- Same command-line interface as the first implementation
+- Memory-efficient for large token streams
 
 ## Usage
 
-### Without Channels
+Both programs support the same command-line parameters:
 
-```bash
-go run tomtoken_without_channels.go
+```
+-output string
+    Output: 'stdout' or path to .json file (default "stdout")
+-tokens int
+    Number of TomToken tokens to generate (default varies by implementation)
 ```
 
-### With Channels
+### Examples
 
-```bash
-# Output to stdout
-go run tomtoken_with_channels.go
-
-# Output to file with custom token count
-go run tomtoken_with_channels.go -output output.json -tokens 50000
+Generate 10,000 tokens and output to stdout:
+```
+./tomtoken_without_channels -tokens=10000
 ```
 
-## Performance
+Generate 1 million tokens and save to a file:
+```
+./tomtoken_with_channels -tokens=1000000 -output=output.json
+```
 
-The channel-based implementation is particularly efficient for large datasets, similar to the `yield` approach in Python and C#, and works effectively even with millions of elements.
+## TomToken Format
+
+TomToken is a flexible token format that can represent:
+
+1. String tokens - Regular text strings
+2. Numeric references - References to entries in the referenceMap (e.g., spaces, tabs)
+3. Structured tokens - Objects with type, mode, count, and value properties
+
+The output is a JSON structure with:
+- `metadata`: Information about the generated content
+- `referenceMap`: A mapping of numeric IDs to their string values
+- `content`: An array of tokens (strings, numbers, or objects)
+
+## Performance Considerations
+
+The channel-based implementation is more memory-efficient for large token streams as it doesn't need to store all tokens in memory before serialization. This makes it suitable for generating very large token streams.
+
+## License
+
+MIT

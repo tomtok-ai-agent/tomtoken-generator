@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"math/rand"
 	"os"
 	"strings"
@@ -23,15 +24,15 @@ type GeneratorSettings struct {
 	TokenCount int
 }
 
-// Token generator using channels
+// GenerateTokens creates a channel that produces tokens
+// This is the key difference from the non-channel version:
+// tokens are generated on-demand and streamed through the channel
 func GenerateTokens(settings GeneratorSettings) <-chan interface{} {
 	ch := make(chan interface{}, 100) // buffered channel for efficiency
 
 	go func() {
 		defer close(ch)
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-		// Space token IDs: 1 = regular space, 3 = non-breaking space
 
 		for generated := 0; generated < settings.TokenCount; {
 			// Generate a word
@@ -95,32 +96,33 @@ func GenerateTokens(settings GeneratorSettings) <-chan interface{} {
 }
 
 func main() {
-	// Command line parameters
-	outputFile := flag.String("output", "stdout", "output: stdout or file")
-	tokenCount := flag.Int("tokens", 100_000, "number of tokens")
+	// Parse command line arguments
+	outputFlag := flag.String("output", "stdout", "Output: 'stdout' or path to .json file")
+	tokensFlag := flag.Int("tokens", 100_000, "Number of TomToken tokens to generate")
 	flag.Parse()
 
-	var out *os.File
-	var err error
-
-	if *outputFile == "stdout" {
-		out = os.Stdout
+	// Setup output (stdout or file)
+	var outFile *os.File
+	if *outputFlag == "stdout" {
+		outFile = os.Stdout
 	} else {
-		out, err = os.Create(*outputFile)
+		f, err := os.Create(*outputFlag)
 		if err != nil {
-			panic(err)
+			fmt.Fprintf(os.Stderr, "Error opening output file: %v\n", err)
+			os.Exit(1)
 		}
-		defer out.Close()
+		defer f.Close()
+		outFile = f
 	}
-
-	writer := bufio.NewWriter(out)
+	writer := bufio.NewWriter(outFile)
 	defer writer.Flush()
 
-	// Start forming JSON
-	header := map[string]interface{}{
+	// Write metadata
+	created := time.Now().UTC().Format(time.RFC3339)
+	metadata := map[string]interface{}{
 		"metadata": map[string]string{
 			"title":   "Generated TomToken Stream",
-			"created": time.Now().UTC().Format(time.RFC3339),
+			"created": created,
 		},
 		"referenceMap": map[string]string{
 			"1": " ",
@@ -129,22 +131,24 @@ func main() {
 		},
 	}
 
-	encoder := json.NewEncoder(writer)
+	// Start forming JSON
 	writer.WriteString("{\n")
 
 	// Write metadata and referenceMap
+	metadataBytes, _ := json.Marshal(metadata["metadata"])
 	writer.WriteString(`"metadata": `)
-	encoder.Encode(header["metadata"])
+	writer.Write(metadataBytes)
 	writer.WriteString(",\n")
 
+	refMapBytes, _ := json.Marshal(metadata["referenceMap"])
 	writer.WriteString(`"referenceMap": `)
-	encoder.Encode(header["referenceMap"])
+	writer.Write(refMapBytes)
 	writer.WriteString(",\n")
 
 	writer.WriteString(`"content": [` + "\n")
 
 	// Stream generation and writing of tokens
-	tokenCh := GenerateTokens(GeneratorSettings{TokenCount: *tokenCount})
+	tokenCh := GenerateTokens(GeneratorSettings{TokenCount: *tokensFlag})
 	first := true
 	lineLen := 0
 
@@ -162,12 +166,15 @@ func main() {
 		// Control line length (250 characters)
 		tokenStr := string(tokenData)
 		if !first {
-			tokenStr = "," + tokenStr
+			tokenStr = ", " + tokenStr
 		}
+		
 		if lineLen+len(tokenStr) > 250 {
 			writer.WriteString("\n")
 			lineLen = 0
-			tokenStr = strings.TrimPrefix(tokenStr, ",") // comma is already on the previous line
+			if !first {
+				tokenStr = strings.TrimPrefix(tokenStr, ", ") // comma is already on the previous line
+			}
 		}
 
 		writer.WriteString(tokenStr)
